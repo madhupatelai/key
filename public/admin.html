@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>Key Admin Panel</title>
 
   <style>
@@ -14,13 +15,14 @@
     body {
       margin: 0;
       min-height: 100vh;
-      background: #0f1117;
+      background: #0b0d12;
       color: white;
-      padding: 30px 15px;
+      padding: 20px;
     }
 
     .container {
-      max-width: 700px;
+      width: 100%;
+      max-width: 750px;
       margin: auto;
     }
 
@@ -30,11 +32,11 @@
     }
 
     .card {
-      background: #181b24;
-      border: 1px solid #292e3a;
-      border-radius: 14px;
+      background: #151820;
+      border: 1px solid #292e39;
+      border-radius: 16px;
       padding: 20px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
 
     input,
@@ -42,42 +44,92 @@
       width: 100%;
       padding: 13px;
       margin-top: 10px;
-      border-radius: 8px;
-      border: none;
+      border-radius: 9px;
+      font-size: 15px;
     }
 
     input {
-      background: #242936;
+      background: #0e1117;
       color: white;
-      border: 1px solid #353b49;
+      border: 1px solid #343a47;
+      outline: none;
     }
 
     button {
-      background: #4f7cff;
+      border: 0;
+      background: #5275ff;
       color: white;
       font-weight: bold;
       cursor: pointer;
     }
 
     button:hover {
-      opacity: 0.9;
+      opacity: .9;
     }
 
-    #result {
+    .key-card {
+      background: #0e1117;
+      border: 1px solid #292e39;
+      border-radius: 12px;
+      padding: 15px;
+      margin-top: 12px;
+    }
+
+    .status {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .active {
+      background: #12351f;
+      color: #63ff96;
+    }
+
+    .expired {
+      background: #382b12;
+      color: #ffc857;
+    }
+
+    .revoked {
+      background: #391719;
+      color: #ff7777;
+    }
+
+    .info {
+      color: #9ca3af;
+      font-size: 13px;
+      margin-top: 7px;
+    }
+
+    .danger {
+      background: #b83232;
+    }
+
+    .delete {
+      background: #444b59;
+    }
+
+    #message {
       margin-top: 15px;
-      padding: 12px;
+      padding: 10px;
       border-radius: 8px;
-      background: #11141b;
-      white-space: pre-wrap;
-      word-break: break-word;
+      display: none;
     }
 
-    .key {
-      background: #11141b;
-      padding: 12px;
-      border-radius: 8px;
-      margin-top: 10px;
-      word-break: break-all;
+    .success {
+      display: block !important;
+      background: #12351f;
+      color: #63ff96;
+    }
+
+    .error {
+      display: block !important;
+      background: #391719;
+      color: #ff7777;
     }
   </style>
 </head>
@@ -88,7 +140,9 @@
 
   <h1>🔐 Key Admin Panel</h1>
 
+  <!-- ADMIN LOGIN -->
   <div class="card">
+
     <h2>Admin Login</h2>
 
     <input
@@ -97,14 +151,18 @@
       placeholder="Admin Password"
     >
 
-    <button onclick="loadKeys()">
-      Login / Load Keys
+    <button onclick="loginAdmin()">
+      LOGIN
     </button>
 
-    <div id="result"></div>
+    <div id="message"></div>
+
   </div>
 
+
+  <!-- CREATE KEY -->
   <div class="card">
+
     <h2>Create Key</h2>
 
     <input
@@ -113,78 +171,148 @@
       placeholder="Enter key"
     >
 
+    <input
+      type="number"
+      id="expiryDays"
+      value="1"
+      min="1"
+      placeholder="Expiry days"
+    >
+
     <button onclick="createKey()">
-      Create Key
+      CREATE KEY
     </button>
+
   </div>
 
+
+  <!-- KEYS -->
   <div class="card">
+
     <h2>Keys</h2>
 
     <div id="keys">
-      No keys loaded.
+      Login first to load keys.
     </div>
+
   </div>
 
 </div>
+
 
 <script>
 
 let adminPassword = "";
 
-async function loadKeys() {
+
+/* MESSAGE */
+function showMessage(text, type) {
+
+  const message =
+    document.getElementById("message");
+
+  message.textContent = text;
+  message.className = type;
+
+}
+
+
+/* ADMIN LOGIN */
+async function loginAdmin() {
 
   adminPassword =
-    document.getElementById("adminPassword").value;
+    document.getElementById("adminPassword").value.trim();
 
   if (!adminPassword) {
-    document.getElementById("result").textContent =
-      "Enter admin password.";
+
+    showMessage(
+      "Enter admin password.",
+      "error"
+    );
+
     return;
   }
+
+  await loadKeys();
+}
+
+
+/* LOAD KEYS */
+async function loadKeys() {
 
   try {
 
     const response = await fetch("/api/keys", {
+
       headers: {
         "x-admin-password": adminPassword
       }
+
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      document.getElementById("result").textContent =
-        data.error || "Login failed.";
+
+      showMessage(
+        data.error || "Login failed.",
+        "error"
+      );
+
       return;
     }
 
-    document.getElementById("result").textContent =
-      "Admin login successful.";
+    showMessage(
+      "Admin login successful.",
+      "success"
+    );
 
-    showKeys(data);
+    displayKeys(data.keys || []);
 
   } catch (error) {
 
-    document.getElementById("result").textContent =
-      "Server connection failed.";
+    showMessage(
+      "Server connection failed.",
+      "error"
+    );
+
   }
 }
 
 
+/* CREATE KEY */
 async function createKey() {
+
+  if (!adminPassword) {
+
+    showMessage(
+      "Login as admin first.",
+      "error"
+    );
+
+    return;
+  }
 
   const key =
     document.getElementById("newKey").value.trim();
 
-  if (!adminPassword) {
-    alert("First login as admin.");
+  let days =
+    Number(
+      document.getElementById("expiryDays").value
+    );
+
+  if (!key) {
+
+    showMessage(
+      "Enter a key.",
+      "error"
+    );
+
     return;
   }
 
-  if (!key) {
-    alert("Enter a key.");
-    return;
+  if (!days || days < 1) {
+    days = 1;
   }
 
   try {
@@ -199,7 +327,8 @@ async function createKey() {
       },
 
       body: JSON.stringify({
-        key: key
+        key: key,
+        days: days
       })
 
     });
@@ -207,31 +336,42 @@ async function createKey() {
     const data = await response.json();
 
     if (!response.ok) {
-      alert(data.error || "Failed to create key.");
+
+      showMessage(
+        data.error || "Failed to create key.",
+        "error"
+      );
+
       return;
     }
 
-    alert("Key created successfully.");
+    showMessage(
+      `Key created for ${days} day(s).`,
+      "success"
+    );
 
     document.getElementById("newKey").value = "";
 
-    loadKeys();
+    await loadKeys();
 
   } catch (error) {
 
-    alert("Server connection failed.");
+    showMessage(
+      "Server connection failed.",
+      "error"
+    );
+
   }
 }
 
 
-function showKeys(data) {
+/* DISPLAY KEYS */
+function displayKeys(keys) {
 
   const container =
     document.getElementById("keys");
 
-  let keys = data.keys || data;
-
-  if (!Array.isArray(keys) || keys.length === 0) {
+  if (!keys.length) {
 
     container.innerHTML =
       "<p>No keys available.</p>";
@@ -241,21 +381,180 @@ function showKeys(data) {
 
   container.innerHTML = "";
 
-  keys.forEach((item, index) => {
+  keys.forEach(item => {
 
-    const div =
+    const card =
       document.createElement("div");
 
-    div.className = "key";
+    card.className = "key-card";
 
-    div.textContent =
-      typeof item === "string"
-        ? item
-        : JSON.stringify(item, null, 2);
+    const created =
+      formatDate(item.createdAt);
 
-    container.appendChild(div);
+    const expires =
+      item.expiresAt
+        ? formatDate(item.expiresAt)
+        : "No expiry";
+
+    let statusClass = "active";
+
+    if (item.status === "Expired") {
+      statusClass = "expired";
+    }
+
+    if (item.status === "Revoked") {
+      statusClass = "revoked";
+    }
+
+    card.innerHTML = `
+
+      <strong>Key ID:</strong>
+      <div class="info">
+        ${item.id}
+      </div>
+
+      <div class="status ${statusClass}">
+        ${item.status}
+      </div>
+
+      <div class="info">
+        Created: ${created}
+      </div>
+
+      <div class="info">
+        Expires: ${expires}
+      </div>
+
+      <button
+        class="danger"
+        onclick="revokeKey('${item.id}')"
+        ${item.status !== "Active" ? "disabled" : ""}
+      >
+        REVOKE
+      </button>
+
+      <button
+        class="delete"
+        onclick="deleteKey('${item.id}')"
+      >
+        DELETE
+      </button>
+
+    `;
+
+    container.appendChild(card);
 
   });
+
+}
+
+
+/* REVOKE */
+async function revokeKey(id) {
+
+  if (!confirm("Revoke this key?")) {
+    return;
+  }
+
+  try {
+
+    const response = await fetch(
+      `/api/keys/${id}/revoke`,
+      {
+        method: "POST",
+        headers: {
+          "x-admin-password": adminPassword
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+
+      showMessage(
+        data.error || "Failed.",
+        "error"
+      );
+
+      return;
+    }
+
+    showMessage(
+      "Key revoked.",
+      "success"
+    );
+
+    await loadKeys();
+
+  } catch (error) {
+
+    showMessage(
+      "Server connection failed.",
+      "error"
+    );
+
+  }
+}
+
+
+/* DELETE */
+async function deleteKey(id) {
+
+  if (!confirm("Delete this key permanently?")) {
+    return;
+  }
+
+  try {
+
+    const response = await fetch(
+      `/api/keys/${id}`,
+      {
+        method: "DELETE",
+        headers: {
+          "x-admin-password": adminPassword
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+
+      showMessage(
+        data.error || "Failed.",
+        "error"
+      );
+
+      return;
+    }
+
+    showMessage(
+      "Key deleted.",
+      "success"
+    );
+
+    await loadKeys();
+
+  } catch (error) {
+
+    showMessage(
+      "Server connection failed.",
+      "error"
+    );
+
+  }
+}
+
+
+/* DATE FORMAT */
+function formatDate(timestamp) {
+
+  if (!timestamp) {
+    return "N/A";
+  }
+
+  return new Date(timestamp).toLocaleString();
 
 }
 
