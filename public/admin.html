@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Key Admin Panel</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1117;
+      color: white;
+      padding: 30px 15px;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .card {
+      background: #181b24;
+      border: 1px solid #292e3a;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    input,
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    input {
+      background: #242936;
+      color: white;
+      border: 1px solid #353b49;
+    }
+
+    button {
+      background: #4f7cff;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    #result {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #11141b;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .key {
+      background: #11141b;
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 10px;
+      word-break: break-all;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>🔐 Key Admin Panel</h1>
+
+  <div class="card">
+    <h2>Admin Login</h2>
+
+    <input
+      type="password"
+      id="adminPassword"
+      placeholder="Admin Password"
+    >
+
+    <button onclick="loadKeys()">
+      Login / Load Keys
+    </button>
+
+    <div id="result"></div>
+  </div>
+
+  <div class="card">
+    <h2>Create Key</h2>
+
+    <input
+      type="text"
+      id="newKey"
+      placeholder="Enter key"
+    >
+
+    <button onclick="createKey()">
+      Create Key
+    </button>
+  </div>
+
+  <div class="card">
+    <h2>Keys</h2>
+
+    <div id="keys">
+      No keys loaded.
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+let adminPassword = "";
+
+async function loadKeys() {
+
+  adminPassword =
+    document.getElementById("adminPassword").value;
+
+  if (!adminPassword) {
+    document.getElementById("result").textContent =
+      "Enter admin password.";
+    return;
+  }
+
+  try {
+
+    const response = await fetch("/api/keys", {
+      headers: {
+        "x-admin-password": adminPassword
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      document.getElementById("result").textContent =
+        data.error || "Login failed.";
+      return;
+    }
+
+    document.getElementById("result").textContent =
+      "Admin login successful.";
+
+    showKeys(data);
+
+  } catch (error) {
+
+    document.getElementById("result").textContent =
+      "Server connection failed.";
+  }
+}
+
+
+async function createKey() {
+
+  const key =
+    document.getElementById("newKey").value.trim();
+
+  if (!adminPassword) {
+    alert("First login as admin.");
+    return;
+  }
+
+  if (!key) {
+    alert("Enter a key.");
+    return;
+  }
+
+  try {
+
+    const response = await fetch("/api/keys", {
+
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-password": adminPassword
+      },
+
+      body: JSON.stringify({
+        key: key
+      })
+
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.error || "Failed to create key.");
+      return;
+    }
+
+    alert("Key created successfully.");
+
+    document.getElementById("newKey").value = "";
+
+    loadKeys();
+
+  } catch (error) {
+
+    alert("Server connection failed.");
+  }
+}
+
+
+function showKeys(data) {
+
+  const container =
+    document.getElementById("keys");
+
+  let keys = data.keys || data;
+
+  if (!Array.isArray(keys) || keys.length === 0) {
+
+    container.innerHTML =
+      "<p>No keys available.</p>";
+
+    return;
+  }
+
+  container.innerHTML = "";
+
+  keys.forEach((item, index) => {
+
+    const div =
+      document.createElement("div");
+
+    div.className = "key";
+
+    div.textContent =
+      typeof item === "string"
+        ? item
+        : JSON.stringify(item, null, 2);
+
+    container.appendChild(div);
+
+  });
+
+}
+
+</script>
+
+</body>
+</html>
