@@ -55,14 +55,27 @@ function checkAdmin(req) {
   return req.headers["x-admin-password"] === ADMIN_PASSWORD;
 }
 
+function getStatus(item) {
+  if (item.revoked) return "Revoked";
 
-// Home page
+  if (
+    item.expiresAt &&
+    Date.now() >= item.expiresAt
+  ) {
+    return "Expired";
+  }
+
+  return "Active";
+}
+
+
+// Home
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 
-// User key login
+// USER LOGIN
 app.post("/api/login", (req, res) => {
 
   const key = String(req.body.key || "").trim();
@@ -76,7 +89,9 @@ app.post("/api/login", (req, res) => {
   const keys = readKeys();
   const hashed = hashKey(key);
 
-  const found = keys.find(item => item.hash === hashed);
+  const found = keys.find(
+    item => item.hash === hashed
+  );
 
   if (!found) {
     return res.status(401).json({
@@ -84,20 +99,24 @@ app.post("/api/login", (req, res) => {
     });
   }
 
-  if (found.expiresAt && Date.now() > found.expiresAt) {
+  const status = getStatus(found);
+
+  if (status !== "Active") {
     return res.status(401).json({
-      error: "Key expired."
+      error: `Key ${status.toLowerCase()}.`
     });
   }
 
   res.json({
     success: true,
-    message: "Login successful."
+    message: "Login successful.",
+    status: "Active",
+    expiresAt: found.expiresAt
   });
 });
 
 
-// Get all keys - Admin only
+// ADMIN - GET KEYS
 app.get("/api/keys", (req, res) => {
 
   if (!checkAdmin(req)) {
@@ -108,13 +127,20 @@ app.get("/api/keys", (req, res) => {
 
   const keys = readKeys();
 
+  const result = keys.map(item => ({
+    id: item.id,
+    createdAt: item.createdAt,
+    expiresAt: item.expiresAt,
+    status: getStatus(item)
+  }));
+
   res.json({
-    keys
+    keys: result
   });
 });
 
 
-// Create key - Admin only
+// ADMIN - CREATE KEY
 app.post("/api/keys", (req, res) => {
 
   if (!checkAdmin(req)) {
@@ -131,10 +157,20 @@ app.post("/api/keys", (req, res) => {
     });
   }
 
+  let days = Number(req.body.days);
+
+  if (!Number.isFinite(days) || days <= 0) {
+    days = 1;
+  }
+
+  days = Math.floor(days);
+
   const keys = readKeys();
   const hashed = hashKey(key);
 
-  const exists = keys.some(item => item.hash === hashed);
+  const exists = keys.some(
+    item => item.hash === hashed
+  );
 
   if (exists) {
     return res.status(409).json({
@@ -142,23 +178,62 @@ app.post("/api/keys", (req, res) => {
     });
   }
 
+  const now = Date.now();
+
+  const expiresAt =
+    now + days * 24 * 60 * 60 * 1000;
+
   keys.push({
     id: crypto.randomUUID(),
     hash: hashed,
-    createdAt: Date.now(),
-    expiresAt: null
+    createdAt: now,
+    expiresAt: expiresAt,
+    revoked: false
   });
 
   saveKeys(keys);
 
   res.json({
     success: true,
-    message: "Key created successfully."
+    message: `Key created for ${days} day(s).`,
+    expiresAt: expiresAt
   });
 });
 
 
-// Delete key - Admin only
+// ADMIN - REVOKE KEY
+app.post("/api/keys/:id/revoke", (req, res) => {
+
+  if (!checkAdmin(req)) {
+    return res.status(401).json({
+      error: "Unauthorized."
+    });
+  }
+
+  const keys = readKeys();
+
+  const key = keys.find(
+    item => item.id === req.params.id
+  );
+
+  if (!key) {
+    return res.status(404).json({
+      error: "Key not found."
+    });
+  }
+
+  key.revoked = true;
+
+  saveKeys(keys);
+
+  res.json({
+    success: true,
+    message: "Key revoked."
+  });
+});
+
+
+// ADMIN - DELETE KEY
 app.delete("/api/keys/:id", (req, res) => {
 
   if (!checkAdmin(req)) {
